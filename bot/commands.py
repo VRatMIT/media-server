@@ -8,7 +8,6 @@ class ControlCommands(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_command(name="on", description="Turns the matrix on (if off).")
-    @commands.guild_only()
     async def on(self, ctx: commands.Context):
         if matrix.state["power"]:
             await ctx.send("The matrix is already on.", ephemeral=True)
@@ -18,7 +17,6 @@ class ControlCommands(commands.Cog):
         await ctx.send("Matrix turned on.")
 
     @commands.hybrid_command(name="off", description="Turns the matrix off (if on). Also clears the queue.")
-    @commands.guild_only()
     async def off(self, ctx: commands.Context):
         if not matrix.state["power"]:
             await ctx.send("The matrix is already off.", ephemeral=True)
