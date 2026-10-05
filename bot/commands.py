@@ -14,6 +14,7 @@ class ControlCommands(commands.Cog):
             return
 
         matrix.action_queue.put(("power", True))
+        matrix.video_queue.put(("iqa", 0))
         await ctx.send("Matrix turned on.")
 
     @commands.hybrid_command(name="off", description="Turns the matrix off (if on). Also clears the queue.")

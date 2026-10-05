@@ -15,8 +15,6 @@ def power_bars(frame, background, progress, turning_on):
 
     frame.paste(background.crop((0, 0, width, bar)), (0, 0))
     frame.paste(background.crop((0, height - bar, width, height)), (0, height - bar))
-    if 0 < closed < 1:
-        ImageDraw.Draw(frame).line((0, height // 2, width, height // 2), fill="white")
     return frame
 
 # Scren that displays when the matrix is off
