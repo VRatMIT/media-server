@@ -14,7 +14,6 @@ class ControlCommands(commands.Cog):
             return
 
         matrix.action_queue.put(("power", True))
-        matrix.video_queue.put(("iqa", 0))
         await ctx.send("Matrix turned on.")
 
     @commands.hybrid_command(name="off", description="Turns the matrix off (if on). Also clears the queue.")
@@ -28,8 +27,9 @@ class ControlCommands(commands.Cog):
         await ctx.send("Matrix turned off.")
 
     @commands.hybrid_command(name="set_brightness", description="Sets the matrix's brightness.")
-    async def set_brightness(self, ctx):
-        pass
+    async def set_brightness(self, ctx: commands.Context, brightness: commands.Range[int, 1, 100]):
+        matrix.action_queue.put(("brightness", brightness))
+        await ctx.send(f"Brightness set to {brightness}.")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ControlCommands(bot))

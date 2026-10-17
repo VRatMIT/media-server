@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFont
 ANIM_FRAMES = 60
 
 # tv bar animations
-def power_bars(frame, background, progress, turning_on):
+def power_bars(frame: Image.Image, background: Image.Image, progress: float, turning_on: bool) -> Image.Image:
     closed = 1 - (1 - progress) ** 3
     if turning_on:
         closed = 1 - closed
@@ -18,7 +18,7 @@ def power_bars(frame, background, progress, turning_on):
     return frame
 
 # Scren that displays when the matrix is off
-def off_screen(width, height, brightness):
+def off_screen(width: int, height: int, brightness: int) -> Image.Image:
     level = min(255, 255 * 5 // max(brightness, 1))
     white = (level, level, level)
 
@@ -28,5 +28,5 @@ def off_screen(width, height, brightness):
 
     clock = datetime.now().strftime("%I:%M").lstrip("0")
     draw.text((width / 2, height / 2), clock, font=ImageFont.load_default(size=64), fill=white, anchor="mm")
-    draw.text((width - 2, height - 2), "OFF", font=ImageFont.load_default(size=12), fill=white, anchor="rd")
+    draw.text((width - 2, height - 2), "OFF", font=ImageFont.load_default(size=24), fill=white, anchor="rd")
     return frame
