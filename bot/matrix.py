@@ -5,13 +5,11 @@ import time
 
 import animations
 import db
+from download import VIDEO_HEIGHT
 from PIL import Image
 from rgbmatrix import RGBMatrix, RGBMatrixOptions
 
 FPS = 60
-
-# Rows at the bottom for text and clock
-TEXT_HEIGHT = 16
 
 def full_matrix():
     options = RGBMatrixOptions()
@@ -91,7 +89,7 @@ def run():
     matrix: RGBMatrix = full_matrix()
 
     width, height = matrix.width, matrix.height
-    video_height = height - TEXT_HEIGHT
+    video_height = VIDEO_HEIGHT  # rows below it are for text and clock
 
     canvas = matrix.CreateFrameCanvas()
 
