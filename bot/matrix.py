@@ -11,7 +11,7 @@ from PIL import Image
 from rgbmatrix import RGBMatrix, RGBMatrixOptions
 
 FPS = 60
-BT_AUDIO_DELAY = 0
+BT_AUDIO_DELAY = 1000
 
 stop = threading.Event()
 
@@ -153,12 +153,12 @@ def run():
                         proc = start_ffmpeg(path, width, VIDEO_HEIGHT)
                         if state["audio"]:
                             audio_proc = start_audio(path)
-                        video_start = time.monotonic()
+                        video_start = time.monotonic() + (BT_AUDIO_DELAY if state["audio"] else 0)
                         frames_read = 0
 
                 frame = Image.new("RGB", (width, height))
 
-                if proc:
+                if proc and time.monotonic() >= video_start:
                     target = int((time.monotonic() - video_start) * FPS) + 1
                     video_frame, frames_read = catch_up(
                         proc, video_frame, frames_read, target, width, VIDEO_HEIGHT
