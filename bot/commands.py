@@ -1,3 +1,6 @@
+import asyncio
+
+import bluetooth
 import matrix
 from discord.ext import commands
 
@@ -30,6 +33,21 @@ class ControlCommands(commands.Cog):
     async def set_brightness(self, ctx: commands.Context, brightness: commands.Range[int, 1, 100]):
         matrix.action_queue.put(("brightness", brightness))
         await ctx.send(f"Brightness set to {brightness}.")
+
+    @commands.hybrid_command(name="audio", description="Turns sound on the room speaker on or off.")
+    async def audio(self, ctx: commands.Context, on: bool):
+        await ctx.defer() #allow more time for bt to respond
+        if not on:
+            matrix.action_queue.put(("audio", False))
+            await asyncio.to_thread(bluetooth.disconnect)
+            await ctx.send("Audio turned off.")
+            return
+
+        if not await asyncio.to_thread(bluetooth.connect):
+            await ctx.send("connection failed")
+            return
+        matrix.action_queue.put(("audio", True))
+        await ctx.send("Audio toggled on. The next video will play audio")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(ControlCommands(bot))

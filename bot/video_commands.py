@@ -50,7 +50,7 @@ class VideoCommands(commands.Cog):
 
     @commands.hybrid_command(name="get_queue", description="Shows the upcoming videos in the queue.")
     async def get_queue(self, ctx: commands.Context, items: int = 5):
-        items = min(items, 20)
+        items = max(min(items, 20), 0) # 0 <= items <= 20
         with matrix.video_queue.mutex:
             upcoming = list(matrix.video_queue.queue)[:items]
 

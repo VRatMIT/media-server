@@ -4,12 +4,52 @@ import threading
 import time
 
 import animations
+import bluetooth
 import db
 from download import VIDEO_HEIGHT
 from PIL import Image
 from rgbmatrix import RGBMatrix, RGBMatrixOptions
 
 FPS = 60
+BT_AUDIO_DELAY = 0
+
+stop = threading.Event()
+
+action_queue = queue.Queue()
+video_queue = queue.Queue()
+
+state = {"power": False, "brightness": 50, "message": None, "audio": False}
+
+
+def apply_actions():
+    while True:
+        try:
+            action, value = action_queue.get_nowait()
+        except queue.Empty:
+            return
+        state[action] = value
+
+
+def next_video():
+    while True:
+        try:
+            title, _ = video_queue.get_nowait()
+        except queue.Empty:
+            return None
+
+        video = db.get_video(title)
+        if video:
+            return db.videos_dir() / video["filename"]
+
+
+def clear_video_queue():
+    while True:
+        try:
+            video_queue.get_nowait()
+        except queue.Empty:
+            return
+
+# ====== Matrix Setup ======
 
 def full_matrix():
     options = RGBMatrixOptions()
@@ -17,12 +57,12 @@ def full_matrix():
     options.cols = 64
     options.chain_length = 4
     options.parallel = 3
-    options.pixel_mapper_config = "" # mostly useless, was useful a while ago
-    options.hardware_mapping = "regular"
+    options.pixel_mapper_config = ""
+    options.hardware_mapping = "regular"    
     options.gpio_slowdown = 3
     options.pwm_bits = 9
     options.brightness = 100
-    options.drop_privileges = False # possibly remove
+    options.drop_privileges = False
     return RGBMatrix(options=options)
 
 def start_ffmpeg(video_path, width, height):
@@ -38,64 +78,56 @@ def start_ffmpeg(video_path, width, height):
         "-vf", video_filters,
         "-f", "rawvideo", "-pix_fmt", "rgb24",
         "-threads", "2",
-        "-", # pipe to stdout
+        "-",
     ]
     return subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=10**7)
 
-# Read frame from ffmpeg process and return the image bytes.
+
+def start_audio(video_path):
+    cmd = [
+        "ffmpeg", "-loglevel", "error",
+        "-i", video_path,
+        "-vn",
+        "-f", "alsa", f"bluealsa:DEV={bluetooth.speaker()}",
+    ]
+    return subprocess.Popen(cmd)
+
+
 def read_frame(proc, width, height) -> Image:
     frame_size = width * height * 3
     raw = proc.stdout.read(frame_size)
-    if len(raw) < frame_size: # not enough bytes means the video has ended?
+    if len(raw) < frame_size:
         return None
     return Image.frombytes("RGB", (width, height), raw)
 
-# Path of the next video in the queue, or None if it's empty
-def next_video():
-    while True:
-        try:
-            title, _ = video_queue.get_nowait()
-        except queue.Empty:
-            return None
 
-        video = db.get_video(title)
-        if video:
-            return db.videos_dir() / video["filename"]
+def kill(proc):
+    if proc:
+        proc.kill()
+    return None
 
-def clear_video_queue():
-    while True:
-        try:
-            video_queue.get_nowait()
-        except queue.Empty:
-            return
 
-stop = threading.Event()
+def catch_up(proc, video_frame, frames_read, target, width, height):
+    while frames_read < target:
+        video_frame = read_frame(proc, width, height)
+        frames_read += 1
+        if video_frame is None:
+            break
+    return video_frame, frames_read
 
-action_queue = queue.Queue()
-video_queue = queue.Queue()
-
-state = {"power": False, "brightness": 50, "message": None}
-
-# Apply actions queue
-def apply_actions():
-    while True:
-        try:
-            action, value = action_queue.get_nowait()
-        except queue.Empty:
-            return
-        state[action] = value
+# -=== Main loop ===
 
 def run():
     matrix: RGBMatrix = full_matrix()
-
     width, height = matrix.width, matrix.height
-    video_height = VIDEO_HEIGHT  # rows below it are for text and clock
-
     canvas = matrix.CreateFrameCanvas()
 
     proc = None
+    audio_proc = None
+    video_frame = None
     was_on = False
     anim_frame = None
+    prev_off_state = None
 
     try:
         while not stop.is_set():
@@ -106,30 +138,35 @@ def run():
                 was_on = state["power"]
                 anim_frame = 0
 
-            off_screen = animations.off_screen(width, height, state["brightness"])
+            off_state = (state["brightness"], time.strftime("%H:%M"))
+            if off_state != prev_off_state:
+                prev_off_state = off_state
+                off_screen = animations.off_screen(width, height, state["brightness"])
 
             if not state["power"] and anim_frame is None:
-                if proc:
-                    proc.kill()
-                    proc = None
+                proc = kill(proc)
                 frame = off_screen
             else:
                 if proc is None and state["power"]:
                     path = next_video()
                     if path:
-                        proc = start_ffmpeg(path, width, video_height)
+                        proc = start_ffmpeg(path, width, VIDEO_HEIGHT)
+                        if state["audio"]:
+                            audio_proc = start_audio(path)
+                        video_start = time.monotonic()
+                        frames_read = 0
 
                 frame = Image.new("RGB", (width, height))
 
                 if proc:
-                    video_frame = read_frame(proc, width, video_height)
-                    if video_frame:
-                        frame.paste(video_frame)
+                    target = int((time.monotonic() - video_start) * FPS) + 1
+                    video_frame, frames_read = catch_up(
+                        proc, video_frame, frames_read, target, width, VIDEO_HEIGHT
+                    )
+                    if video_frame is None:
+                        proc = kill(proc)
                     else:
-                        proc.kill()
-                        proc = None
-
-                # TODO: scrolling text and clock
+                        frame.paste(video_frame)
 
                 if anim_frame is not None:
                     progress = anim_frame / animations.ANIM_FRAMES
@@ -138,12 +175,16 @@ def run():
                     if anim_frame > animations.ANIM_FRAMES:
                         anim_frame = None
 
+            if proc is None or not state["audio"]:
+                audio_proc = kill(audio_proc)
+
             canvas.brightness = state["brightness"]
             canvas.SetImage(frame)
             canvas = matrix.SwapOnVSync(canvas)
 
             stop.wait(max(0, 1 / FPS - (time.monotonic() - frame_start)))
+
     finally:
-        if proc:
-            proc.kill()
+        kill(proc)
+        kill(audio_proc)
         matrix.Clear()
