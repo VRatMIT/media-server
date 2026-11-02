@@ -12,6 +12,7 @@ from rgbmatrix import RGBMatrix, RGBMatrixOptions
 
 FPS = 60
 BT_AUDIO_DELAY = 1000
+IDLE_TIMEOUT = 300
 
 stop = threading.Event()
 
@@ -128,11 +129,18 @@ def run():
     was_on = False
     anim_frame = None
     prev_off_state = None
+    idle_since = time.monotonic()
 
     try:
         while not stop.is_set():
             frame_start = time.monotonic()
             apply_actions()
+
+            if state["power"] and proc is None:
+                if time.monotonic() - idle_since > IDLE_TIMEOUT:
+                    state["power"] = False
+            else:
+                idle_since = time.monotonic()
 
             if state["power"] != was_on:
                 was_on = state["power"]
