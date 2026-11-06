@@ -176,7 +176,7 @@ def run():
                     else:
                         frame.paste(video_frame)
                         # Draw clock in bottom right.
-                        frame.paste(animations.draw_clock(width, height, "rb"))
+                        animations.draw_clock(frame, "rb")
 
                 if anim_frame is not None:
                     progress = anim_frame / animations.ANIM_FRAMES
