@@ -11,7 +11,7 @@ from PIL import Image
 from rgbmatrix import RGBMatrix, RGBMatrixOptions
 
 FPS = 60
-BT_AUDIO_DELAY = 1000
+BT_AUDIO_DELAY = 1.05 # in seconds, not ms
 IDLE_TIMEOUT = 300
 
 stop = threading.Event()
