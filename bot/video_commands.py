@@ -6,6 +6,7 @@ import matrix
 from discord import Colour, Embed
 from download import download_video
 from discord.ext import commands
+from perms import check_perms
 
 MAX_LOOPS = 99
 
@@ -62,6 +63,18 @@ class VideoCommands(commands.Cog):
                     color=Colour.random(),
                     description="".join([f"{i}. `{title}`\n" for i, (title, _) in enumerate(upcoming, start=1)]))
         await ctx.send(embed=embed)
+
+
+    @commands.hybrid_command(name="skip", description="Skips the current video")
+    async def skip(self, ctx: commands.Context, n: int = 1):
+        if not check_perms(ctx.author.id, True):
+            await ctx.send("You do not have sufficient permissions to do so. Ask a matrix tsar.", ephemeral=True)
+            return
+
+        matrix.action_queue.put(("skip", abs(n)))
+        await ctx.send("Skipped the current video." if n == 1 else f"Skipped {abs(n)} videos.")
+
+    
 
 
 

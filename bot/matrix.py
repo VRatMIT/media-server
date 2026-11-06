@@ -19,7 +19,7 @@ stop = threading.Event()
 action_queue = queue.Queue()
 video_queue = queue.Queue()
 
-state = {"power": False, "brightness": 50, "message": None, "audio": False}
+state = {"power": False, "brightness": 50, "message": None, "audio": False, "skip": 0}
 
 
 def apply_actions():
@@ -28,6 +28,7 @@ def apply_actions():
             action, value = action_queue.get_nowait()
         except queue.Empty:
             return
+        
         state[action] = value
 
 
@@ -135,6 +136,14 @@ def run():
         while not stop.is_set():
             frame_start = time.monotonic()
             apply_actions()
+
+            if state["skip"]:
+                if proc:
+                    proc = kill(proc)
+                    audio_proc = kill(audio_proc)
+                    for _ in range(state["skip"] - 1):
+                        next_video()
+                state["skip"] = 0
 
             if state["power"] and proc is None:
                 if time.monotonic() - idle_since > IDLE_TIMEOUT:
