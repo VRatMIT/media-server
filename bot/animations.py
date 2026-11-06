@@ -30,3 +30,14 @@ def off_screen(width: int, height: int, brightness: int) -> Image.Image:
     draw.text((width / 2, height / 2), clock, font=ImageFont.load_default(size=64), fill=white, anchor="mm")
     draw.text((width - 2, height - 2), "OFF", font=ImageFont.load_default(size=24), fill=white, anchor="rd")
     return frame
+
+def draw_clock(frame: Image.Image, anchor) -> Image.Image:
+    clock = datetime.now().strftime("%I:%M").lstrip("0")
+    draw = ImageDraw.Draw(frame)
+    draw.fontmode = "1"  # disable antialias
+
+    width, height = frame.size
+
+    draw.text((width - 1, height - 1), clock, font=ImageFont.load_default(size=24), fill=(255, 255, 255), anchor=anchor)
+
+    return frame
