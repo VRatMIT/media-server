@@ -41,3 +41,19 @@ def draw_clock(frame: Image.Image, anchor) -> Image.Image:
     draw.text((width - 1, height - 1), clock, font=ImageFont.load_default(size=24), fill=(255, 255, 255), anchor=anchor)
 
     return frame
+
+def draw_progress_bar(frame: Image.Image, y: int, percent: float) -> Image.Image:
+    draw = ImageDraw.Draw(frame)
+    x = int(255 * percent)
+
+    # Gray progress bar
+    draw.line([(0, y), (255, y)], (30, 30, 30), 3)
+
+    # Red line
+    draw.line([(0, y), (x, y)], (219, 70, 59), 3)
+
+    # Square if needed
+    if percent > 0:
+        draw.rectangle([(x - 3, y - 3), (x + 3, y + 3)], (255, 255, 255))
+
+    return frame

@@ -4,8 +4,8 @@ import sqlite3
 import db
 import matrix
 from discord import Colour, Embed
-from download import download_video
 from discord.ext import commands
+from download import download_video
 from perms import check_perms
 
 MAX_LOOPS = 99
@@ -20,13 +20,30 @@ class VideoCommands(commands.Cog):
 
     @commands.hybrid_command(name="queue", description="Queues a selected video from the library")
     async def queue(self, ctx: commands.Context, video_title: str, loop: int = 1):
+        if not check_perms(ctx.author.id):
+            await ctx.send("You do not have sufficient permission.", ephemeral=True)
+            return
+        
         loop = min(loop, MAX_LOOPS)
-        for i in range(loop):
-            matrix.video_queue.put((video_title, 0))
+
+        if db.get_video(video_title) is None:
+            await ctx.send("Video not found.")
+            return
+
+
+        matrix.video_queue.put(matrix.QueuedVideo(
+                        title=video_title, 
+                        queued_by=ctx.author.id, 
+                        loop=loop))
+            
         await ctx.send(f"Q'd {video_title}{'.' if loop <= 1 else f' {loop} times.'}")
 
     @commands.hybrid_command(name="download", description="Downloads a video from a youtube link.")
     async def download(self, ctx: commands.Context, url: str, title: str):
+        if not check_perms(ctx.author.id):
+            await ctx.send("You do not have sufficient permission.", ephemeral=True)
+            return
+        
         if not url.startswith(("https://", "http://")):
             await ctx.send("that's not a link (make sure to include http/https)", ephemeral=True)
             return
@@ -51,6 +68,10 @@ class VideoCommands(commands.Cog):
 
     @commands.hybrid_command(name="get_queue", description="Shows the upcoming videos in the queue.")
     async def get_queue(self, ctx: commands.Context, items: int = 5):
+        if not check_perms(ctx.author.id):
+            await ctx.send("You do not have sufficient permission.", ephemeral=True)
+            return
+
         items = max(min(items, 20), 0) # 0 <= items <= 20
         with matrix.video_queue.mutex:
             upcoming = list(matrix.video_queue.queue)[:items]
@@ -61,7 +82,7 @@ class VideoCommands(commands.Cog):
 
         embed = Embed(title = "Queue",
                     color=Colour.random(),
-                    description="".join([f"{i}. `{title}`\n" for i, (title, _) in enumerate(upcoming, start=1)]))
+                    description="".join([f"{i}. `{video.title}`\n" for i, video in enumerate(upcoming, start=1)]))
         await ctx.send(embed=embed)
 
 
@@ -71,10 +92,11 @@ class VideoCommands(commands.Cog):
             await ctx.send("You do not have sufficient permissions to do so. Ask a matrix tsar.", ephemeral=True)
             return
 
-        matrix.action_queue.put(("skip", abs(n)))
-        await ctx.send("Skipped the current video." if n == 1 else f"Skipped {abs(n)} videos.")
+        n = min(max(n, 1), MAX_LOOPS)
 
-    
+        matrix.action_queue.put(("skip", n))
+        await ctx.send("Skipped the current video." if n == 1 else f"Skipped {n} videos.")
+
 
 
 

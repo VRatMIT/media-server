@@ -2,6 +2,8 @@ import queue
 import subprocess
 import threading
 import time
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 import animations
 import bluetooth
@@ -20,6 +22,14 @@ action_queue = queue.Queue()
 video_queue = queue.Queue()
 
 state = {"power": False, "brightness": 50, "message": None, "audio": False, "skip": 0}
+video_state = {"title": None, "queued_by": None, "video_duration": -1, "loops_left": 0}
+
+@dataclass
+class QueuedVideo:
+    title: str
+    queued_by: int = 0
+    queued_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    loop: int = 1
 
 
 def apply_actions():
@@ -35,13 +45,21 @@ def apply_actions():
 def next_video():
     while True:
         try:
-            title, _ = video_queue.get_nowait()
+            queued = video_queue.get_nowait()
         except queue.Empty:
             return None
 
-        video = db.get_video(title)
+        video = db.get_video(queued.title)
         if video:
+            video_state.update(title=queued.title, queued_by=queued.queued_by, loops_left=queued.loop - 1)
             return db.videos_dir() / video["filename"]
+
+def replay_video():
+    if video_state["loops_left"] <= 0:
+        return None
+    video_state["loops_left"] -= 1
+    video = db.get_video(video_state["title"])
+    return db.videos_dir() / video["filename"] if video else None
 
 
 def clear_video_queue():
@@ -83,6 +101,16 @@ def start_ffmpeg(video_path, width, height):
         "-",
     ]
     return subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=10**7)
+
+
+def get_duration(video_path):
+    try:
+        out = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(video_path)],
+            capture_output=True, text=True, timeout=10, check=True).stdout
+        return float(out)
+    except (subprocess.SubprocessError, ValueError, OSError):
+        return -1
 
 
 def start_audio(video_path):
@@ -143,6 +171,7 @@ def run():
                     audio_proc = kill(audio_proc)
                     for _ in range(state["skip"] - 1):
                         next_video()
+                    video_state["loops_left"] = 0
                 state["skip"] = 0
 
             if state["power"] and proc is None:
@@ -162,11 +191,17 @@ def run():
 
             if not state["power"] and anim_frame is None:
                 proc = kill(proc)
+                video_state["loops_left"] = 0
                 frame = off_screen
             else:
                 if proc is None and state["power"]:
-                    path = next_video()
+
+                    path = replay_video()
+                    if not path:
+                        path = next_video()
+                        
                     if path:
+                        video_state["video_duration"] = get_duration(path)
                         proc = start_ffmpeg(path, width, VIDEO_HEIGHT)
                         if state["audio"]:
                             audio_proc = start_audio(path)
@@ -184,8 +219,13 @@ def run():
                         proc = kill(proc)
                     else:
                         frame.paste(video_frame)
-                        # Draw clock in bottom right.
-                        animations.draw_clock(frame, "rb")
+
+                if state["power"]:
+                    animations.draw_clock(frame, "rb")
+                    duration = video_state["video_duration"]
+                    playing = proc and time.monotonic() >= video_start and duration > 0
+                    percent = (time.monotonic() - video_start) / duration if playing else 0
+                    animations.draw_progress_bar(frame, 144, min(max(percent, 0), 1))
 
                 if anim_frame is not None:
                     progress = anim_frame / animations.ANIM_FRAMES
