@@ -219,3 +219,5 @@ __marimo__/
 
 # Runtime data (SQLite db, videos) when MEDIA_SERVER_DATA is unset
 /data/
+
+cookies.txt

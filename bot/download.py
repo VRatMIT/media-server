@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 import uuid
@@ -38,6 +39,7 @@ def download_video(url: str) -> str:
         "quiet": True, # no logs
         "noprogress": True,
         "no_warnings": True,
+        "cookiefile": os.getenv("YTDLP_COOKIES") or None,
     }
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
