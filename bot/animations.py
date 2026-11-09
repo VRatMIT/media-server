@@ -1,8 +1,13 @@
+import time
 from datetime import datetime
 
 from PIL import Image, ImageDraw, ImageFont
 
 ANIM_FRAMES = 60
+
+FONT = ImageFont.load_default(size=20)
+LINE_HEIGHT = 20
+SCROLL_SPEED = 20
 
 # tv bar animations
 def power_bars(frame: Image.Image, background: Image.Image, progress: float, turning_on: bool) -> Image.Image:
@@ -31,14 +36,22 @@ def off_screen(width: int, height: int, brightness: int) -> Image.Image:
     draw.text((width - 2, height - 2), "OFF", font=ImageFont.load_default(size=24), fill=white, anchor="rd")
     return frame
 
-def draw_clock(frame: Image.Image, anchor) -> Image.Image:
+def draw_bottom_bar(frame: Image.Image, message: str | None) -> Image.Image:
     clock = datetime.now().strftime("%I:%M").lstrip("0")
     draw = ImageDraw.Draw(frame)
     draw.fontmode = "1"  # disable antialias
 
     width, height = frame.size
+    clock_x = width - draw.textlength(clock, font=FONT) - 4
 
-    draw.text((width - 1, height - 1), clock, font=ImageFont.load_default(size=24), fill=(255, 255, 255), anchor=anchor)
+    if message:
+        loop = clock_x + draw.textlength(message, font=FONT)
+        x = clock_x - time.monotonic() * SCROLL_SPEED % loop
+        draw.text((x, height), message, font=FONT, fill=(255, 255, 255), anchor="lb")
+
+
+    draw.rectangle([(clock_x, height - LINE_HEIGHT), (width, height)], fill=(0, 0, 0))
+    draw.text((width, height), clock, font=FONT, fill=(255, 255, 255), anchor="rb")
 
     return frame
 
@@ -56,4 +69,18 @@ def draw_progress_bar(frame: Image.Image, y: int, percent: float) -> Image.Image
     if percent > 0:
         draw.rectangle([(x - 3, y - 3), (x + 3, y + 3)], (255, 255, 255))
 
+    return frame
+
+def draw_media_name(frame: Image.Image, y: int, title: str | None) -> Image.Image:
+    if not title:
+        return frame
+    draw = ImageDraw.Draw(frame)
+    draw.fontmode = "1"  # disable antialias
+    overflow = draw.textlength(title, font=FONT) - frame.width
+    x = 0
+    if overflow > 0:
+        p = time.monotonic() * SCROLL_SPEED % (2 * overflow)
+        x = -min(p, 2 * overflow - p)
+
+    draw.text((x, y), title, font=FONT, fill=(255, 255, 255), anchor="lt")
     return frame

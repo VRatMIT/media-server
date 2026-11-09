@@ -14,7 +14,7 @@ from rgbmatrix import RGBMatrix, RGBMatrixOptions
 
 FPS = 60
 BT_AUDIO_DELAY = 1.05 # in seconds, not ms
-IDLE_TIMEOUT = 300
+IDLE_TIMEOUT = 43200
 
 stop = threading.Event()
 
@@ -30,6 +30,15 @@ class QueuedVideo:
     queued_by: int = 0
     queued_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     loop: int = 1
+
+@dataclass
+class Playback:
+    proc: subprocess.Popen
+    audio_proc: subprocess.Popen
+    video_frame: int
+    video_start: int
+    frames_read: int
+
 
 
 def apply_actions():
@@ -145,6 +154,25 @@ def catch_up(proc, video_frame, frames_read, target, width, height):
             break
     return video_frame, frames_read
 
+
+# === Main functions ===
+def handle_skips(pb: Playback) -> None:
+    if state["skip"]:
+        if pb.proc:
+            pb.proc = kill(pb.proc)
+            pb.audio_proc = kill(pb.audio_proc)
+            for _ in range(state["skip"] - 1):
+                next_video()
+            video_state["loops_left"] = 0
+        state["skip"] = 0
+
+def check_timeout(pb: Playback, idle: float):
+    if state["power"] and pb.proc is None:
+        if time.monotonic() - idle > IDLE_TIMEOUT:
+            state["power"] = False
+    else:
+        idle = time.monotonic()
+
 # -=== Main loop ===
 
 def run():
@@ -221,11 +249,12 @@ def run():
                         frame.paste(video_frame)
 
                 if state["power"]:
-                    animations.draw_clock(frame, "rb")
+                    animations.draw_bottom_bar(frame, state["message"])
                     duration = video_state["video_duration"]
                     playing = proc and time.monotonic() >= video_start and duration > 0
                     percent = (time.monotonic() - video_start) / duration if playing else 0
                     animations.draw_progress_bar(frame, 144, min(max(percent, 0), 1))
+                    animations.draw_media_name(frame, 148, video_state["title"])
 
                 if anim_frame is not None:
                     progress = anim_frame / animations.ANIM_FRAMES
