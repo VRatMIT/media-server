@@ -98,6 +98,23 @@ class VideoCommands(commands.Cog):
         await ctx.send("Skipped the current video." if n == 1 else f"Skipped {n} videos.")
 
 
+    @commands.hybrid_command(name="search", description="Search the video database")
+    async def search(self, ctx: commands.Context, query: str, limit: int = 5):
+        if not check_perms(ctx.author.id):
+            await ctx.send("You do not have sufficient permission.", ephemeral=True)
+            return
+
+        results = db.search_videos_fuzzy(query, limit) # List of tuples of (name, score, index)
+
+        embed = Embed(title=f"Search: {query}",
+                    color=Colour.random(),
+                    description="".join(f"{i}. `{title}` — {score:.0f}%\n"
+                                        for i, (title, score, _) in enumerate(results, start=1)))
+        await ctx.send(embed=embed)
+
+
+
+
 
 
 async def setup(bot: commands.Bot):
