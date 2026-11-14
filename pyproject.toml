@@ -1,0 +1,22 @@
+[project]
+name = "media-server"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Ryan", email = "rylagon@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "discord>=2.3.2",
+    "pillow>=13.0.0",
+    "rapidfuzz>=3.14.6",
+    "yt-dlp>=2026.10.26",
+]
+
+[project.scripts]
+media-server = "media_server:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
