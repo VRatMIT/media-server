@@ -6,11 +6,13 @@ readme = "README.md"
 authors = [
     { name = "Ryan", email = "rylagon@gmail.com" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
     "discord>=2.3.2",
     "pillow>=13.0.0",
+    "python-dotenv>=1.2.4",
     "rapidfuzz>=3.14.6",
+    "rgbmatrix",
     "yt-dlp>=2026.10.26",
 ]
 
@@ -20,3 +22,9 @@ media-server = "media_server:main"
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.uv]
+python-preference = "only-system"
+
+[tool.uv.sources]
+rgbmatrix = { path = "/home/pi/rpi-rgb-led-matrix" }
